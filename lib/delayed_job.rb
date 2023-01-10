@@ -25,3 +25,6 @@ end
 
 Object.send(:include, Delayed::MessageSending)
 Module.send(:include, Delayed::MessageSendingClassMethods)
+module Delayed
+  include ActiveSupport::Configurable
+end

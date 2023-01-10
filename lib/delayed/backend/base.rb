@@ -76,15 +76,17 @@ module Delayed
 
       def invoke_job
         Delayed::Worker.lifecycle.run_callbacks(:invoke_job, self) do
-          begin
-            hook :before
-            payload_object.perform
-            hook :success
-          rescue Exception => e # rubocop:disable RescueException
-            hook :error, e
-            raise e
-          ensure
-            hook :after
+          load_current_attributes do
+            begin
+              hook :before
+              payload_object.perform
+              hook :success
+            rescue Exception => e # rubocop:disable RescueException
+              hook :error, e
+              raise e
+            ensure
+              hook :after
+            end
           end
         end
       end
@@ -138,6 +140,13 @@ module Delayed
       end
 
     protected
+
+      def load_current_attributes(&block)
+        return block.call unless Delayed.config.current_class
+
+        deserialized = ActiveJob::Arguments.deserialize(YAML.load(current_attributes || "")).to_h
+        Delayed.config.current_class.set(deserialized, &block)
+      end
 
       def set_default_run_at
         self.run_at ||= self.class.db_time_now
