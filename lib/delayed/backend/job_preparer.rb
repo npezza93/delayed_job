@@ -40,7 +40,7 @@ module Delayed
         return unless Delayed.config.current_class
 
         options[:current_attributes] = YAML.dump(
-          ActiveJob::Arguments.serialize(Delayed.config.current_class.attributes)
+          ActiveJob::Arguments.serialize(Delayed.config.current_class.constantize.attributes)
         )
       end
 

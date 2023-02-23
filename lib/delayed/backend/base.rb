@@ -69,24 +69,27 @@ module Delayed
       end
 
       def payload_object
-        @payload_object ||= YAML.load_dj(handler)
+        @payload_object ||= YAML.load_dj(handler).tap do |object|
+          next if Delayed.config.current_class.blank? || current_attributes.blank?
+
+          deserialized = ActiveJob::Arguments.deserialize(YAML.load(current_attributes)).to_h
+          object.job_data.merge!(current_attributes: deserialized)
+      end
       rescue TypeError, LoadError, NameError, ArgumentError, SyntaxError, Psych::SyntaxError => e
         raise DeserializationError, "Job failed to load: #{e.message}. Handler: #{handler.inspect}"
       end
 
       def invoke_job
         Delayed::Worker.lifecycle.run_callbacks(:invoke_job, self) do
-          load_current_attributes do
-            begin
-              hook :before
-              payload_object.perform
-              hook :success
-            rescue Exception => e # rubocop:disable RescueException
-              hook :error, e
-              raise e
-            ensure
-              hook :after
-            end
+          begin
+            hook :before
+            payload_object.perform
+            hook :success
+          rescue Exception => e # rubocop:disable RescueException
+            hook :error, e
+            raise e
+          ensure
+            hook :after
           end
         end
       end
@@ -140,13 +143,6 @@ module Delayed
       end
 
     protected
-
-      def load_current_attributes(&block)
-        return block.call unless Delayed.config.current_class
-
-        deserialized = ActiveJob::Arguments.deserialize(YAML.load(current_attributes || "")).to_h
-        Delayed.config.current_class.set(deserialized, &block)
-      end
 
       def set_default_run_at
         self.run_at ||= self.class.db_time_now
