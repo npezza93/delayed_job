@@ -70,7 +70,7 @@ module Delayed
 
       def payload_object
         @payload_object ||= YAML.load_dj(handler).tap do |object|
-          next if Delayed.config.current_class.blank? || current_attributes.blank?
+          next if Delayed.config.current_class.blank? || current_attributes.blank? || !object.respond_to?(:job_data)
 
           deserialized = ActiveJob::Arguments.deserialize(YAML.load(current_attributes)).to_h
           object.job_data.merge!(current_attributes: deserialized)
